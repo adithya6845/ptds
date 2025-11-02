@@ -1,0 +1,15 @@
+streamlit==1.30.0
+networkx==2.8.8
+numpy==1.24.3
+pandas==2.1.2
+folium==0.14.0
+streamlit-folium==0.14.0
+plotly==5.20.0
+matplotlib==3.7.1
+scikit-learn==1.2.2
+
+# Note: heavy geospatial packages (osmnx, geopandas) are intentionally omitted
+# from this Streamlit-friendly requirements file because they require system
+# libraries (GDAL/PROJ) that Streamlit Cloud may not provide. To enable full
+# geospatial features, deploy via Docker (see README_DEPLOY.md).
+

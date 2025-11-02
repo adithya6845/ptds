@@ -1,7 +1,12 @@
 # app.py - Web Visualization Dashboard (Gottigere to AMC College)
 import streamlit as st
 import networkx as nx
-import osmnx as ox
+try:
+    import osmnx as ox
+    OSMNX_AVAILABLE = True
+except Exception:
+    ox = None
+    OSMNX_AVAILABLE = False
 import folium
 from folium import Element
 import numpy as np
@@ -33,6 +38,10 @@ def get_color(factor):
 
 st.set_page_config(layout="wide", page_title="PTDS: Gottigere Traffic Predictor")
 
+if not OSMNX_AVAILABLE:
+    st.warning("OSMnx/geopandas not installed in this environment. Map and routing features will be disabled.\n" \
+               "For full functionality, deploy with Docker (see README_DEPLOY.md).")
+
 # --- Session state defaults for validation ---
 if 'start_valid' not in st.session_state:
     st.session_state['start_valid'] = False
@@ -58,6 +67,9 @@ END_NODE_NAME = "AMC Engineering College"
 @st.cache_data
 def load_and_analyze_graph(center_point, dist=GRAPH_RADIUS):
     """Loads the road network around given center using OSMnx. Cached per center/dist."""
+    if not OSMNX_AVAILABLE:
+        st.error("OSMnx is not available in this environment. Map/graph features are disabled.\nFor full functionality deploy using the provided Dockerfile.")
+        return None
     with st.spinner("Loading geographical data..."):
         G = ox.graph_from_point(center_point, dist=dist, network_type="drive")
         return G
@@ -105,6 +117,8 @@ def simulate_prediction(G, hour: int = 8):
 
 def geocode_location(place_name: str):
     """Geocode a place name to (lat, lon) using OSMnx; returns None on failure."""
+    if not OSMNX_AVAILABLE:
+        return None
     try:
         coords = ox.geocoder.geocode(place_name)
         return coords  # (lat, lon)
@@ -691,6 +705,9 @@ with col_validate3:
 
 # Replace button handler: geocode -> compute midpoint -> load graph -> simulate -> visualize
 if st.button("Calculate Optimal Route & Density Map", type="primary"):
+    if not OSMNX_AVAILABLE:
+        st.error("This deployment does not include OSMnx/geopandas.\nFull routing and mapping features are disabled.\nPlease deploy using the Dockerfile in this repo for full functionality.")
+        st.stop()
     # Prefer validated coordinates stored in session_state (if user validated previously)
     start_coords = st.session_state.get('start_coords') or geocode_location(start_location)
     end_coords = st.session_state.get('end_coords') or geocode_location(end_location)
@@ -771,6 +788,7 @@ if st.button("Calculate Optimal Route & Density Map", type="primary"):
                 "Shopping": ["Royal Meenakshi Mall", "Gopalan Mall", "Bannerghatta Mall"],
                 "Education": ["IIM Bangalore", "Christ University", "AMC College"],
                 "Transport": ["Metro Station", "Bus Terminal", "Nice Road Junction"]
+
             }
             
             st.subheader("Nearby Landmarks")
