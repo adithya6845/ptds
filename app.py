@@ -1,12 +1,7 @@
 # app.py - Web Visualization Dashboard (Gottigere to AMC College)
 import streamlit as st
 import networkx as nx
-try:
-    import osmnx as ox
-    OSMNX_AVAILABLE = True
-except Exception:
-    ox = None
-    OSMNX_AVAILABLE = False
+import osmnx as ox
 import folium
 from folium import Element
 import numpy as np
@@ -38,10 +33,6 @@ def get_color(factor):
 
 st.set_page_config(layout="wide", page_title="PTDS: Gottigere Traffic Predictor")
 
-if not OSMNX_AVAILABLE:
-    st.warning("OSMnx/geopandas not installed in this environment. Map and routing features will be disabled.\n" \
-               "For full functionality, deploy with Docker (see README_DEPLOY.md).")
-
 # --- Session state defaults for validation ---
 if 'start_valid' not in st.session_state:
     st.session_state['start_valid'] = False
@@ -66,12 +57,10 @@ END_NODE_NAME = "AMC Engineering College"
 
 @st.cache_data
 def load_and_analyze_graph(center_point, dist=GRAPH_RADIUS):
-    """Loads the road network around given center using OSMnx. Cached per center/dist."""
-    if not OSMNX_AVAILABLE:
-        st.error("OSMnx is not available in this environment. Map/graph features are disabled.\nFor full functionality deploy using the provided Dockerfile.")
-        return None
+    """Loads and projects the road network around given center using OSMnx. Cached per center/dist."""
     with st.spinner("Loading geographical data..."):
         G = ox.graph_from_point(center_point, dist=dist, network_type="drive")
+        G = ox.project_graph(G)  # Project to metric coordinates
         return G
 
 # --- 2. Simulation: AI Prediction Result (Dynamic Weights) ---
@@ -117,8 +106,6 @@ def simulate_prediction(G, hour: int = 8):
 
 def geocode_location(place_name: str):
     """Geocode a place name to (lat, lon) using OSMnx; returns None on failure."""
-    if not OSMNX_AVAILABLE:
-        return None
     try:
         coords = ox.geocoder.geocode(place_name)
         return coords  # (lat, lon)
@@ -224,7 +211,7 @@ def visualize_and_optimize(G, dynamic_weights, start_coords, end_coords, route_t
         center_loc = CENTER_POINT
 
     # Create base map after computing route so it's centered correctly
-    m = folium.Map(location=center_loc, zoom_start=14, tiles="cartodbpositron")
+    m = folium.Map(location=center_loc, zoom_start=14, tiles="cartodbpositron", control_scale=True)
     
     # Add distance scale and fullscreen control
     folium.plugins.Fullscreen().add_to(m)
@@ -565,8 +552,7 @@ def visualize_and_optimize(G, dynamic_weights, start_coords, end_coords, route_t
             st.plotly_chart(fig, use_container_width=True)
             
         
-        # Add a distance scale to the map
-        folium.Scale().add_to(m)
+        
         
         # Add route distance popup to the blue route line
         if optimized_route:
@@ -705,9 +691,6 @@ with col_validate3:
 
 # Replace button handler: geocode -> compute midpoint -> load graph -> simulate -> visualize
 if st.button("Calculate Optimal Route & Density Map", type="primary"):
-    if not OSMNX_AVAILABLE:
-        st.error("This deployment does not include OSMnx/geopandas.\nFull routing and mapping features are disabled.\nPlease deploy using the Dockerfile in this repo for full functionality.")
-        st.stop()
     # Prefer validated coordinates stored in session_state (if user validated previously)
     start_coords = st.session_state.get('start_coords') or geocode_location(start_location)
     end_coords = st.session_state.get('end_coords') or geocode_location(end_location)
@@ -788,7 +771,6 @@ if st.button("Calculate Optimal Route & Density Map", type="primary"):
                 "Shopping": ["Royal Meenakshi Mall", "Gopalan Mall", "Bannerghatta Mall"],
                 "Education": ["IIM Bangalore", "Christ University", "AMC College"],
                 "Transport": ["Metro Station", "Bus Terminal", "Nice Road Junction"]
-
             }
             
             st.subheader("Nearby Landmarks")
